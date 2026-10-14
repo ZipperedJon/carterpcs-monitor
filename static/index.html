@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CarterPCs Monitor</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
+<style>
+  :root {
+    --bg: #0d0f14; --panel: #161a22; --panel2: #1d222c; --border: #2a303c;
+    --text: #e8ebf1; --muted: #8b93a4; --accent: #7c5cff; --ok: #3ecf8e; --bad: #ff5c6c;
+    --youtube: #ff3b3b; --tiktok: #25f4ee; --instagram: #e1306c; --twitter: #1d9bf0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: inherit; }
+  header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header .meta { margin-left: auto; color: var(--muted); font-size: 13px; display: flex; gap: 10px; align-items: center; }
+  nav { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  nav button { background: none; border: 0; color: var(--muted); padding: 10px 14px; font: inherit; cursor: pointer;
+               border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav button.active { color: var(--text); border-bottom-color: var(--tab-color, var(--accent)); }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .big { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 6px; }
+  .stats { display: flex; gap: 22px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stats .card { flex: 1 1 140px; }
+  .posts { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .post { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; text-decoration: none;
+          display: flex; flex-direction: column; transition: transform .12s, border-color .12s; }
+  .post:hover { transform: translateY(-2px); border-color: var(--muted); }
+  .post .thumb { aspect-ratio: 16/9; background: var(--panel2) center/cover no-repeat; display: grid; place-items: center; font-size: 34px; }
+  .post .body { padding: 10px 12px 12px; }
+  .post .title { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--panel2); color: var(--muted); margin-right: 6px; }
+  .latest { display: flex; gap: 10px; align-items: center; margin-top: 12px; text-decoration: none; }
+  .latest img { width: 64px; height: 36px; object-fit: cover; border-radius: 6px; background: var(--panel2); }
+  .latest div { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  svg.spark { width: 100%; height: 40px; margin-top: 8px; }
+  button.btn, .btn { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer; }
+  .btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+  .btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--border); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  section.settings h2 { font-size: 17px; margin: 26px 0 10px; }
+  section.settings h2:first-child { margin-top: 0; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=number], input[type=url], input[type=password], select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 14px; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .row > * { flex: 1 1 200px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: 14px; margin: 6px 14px 0 0; cursor: pointer; }
+  .dest { border-left: 4px solid var(--accent); margin-bottom: 12px; }
+  .dest.discord { border-left-color: #5865f2; }
+  .dest.telegram { border-left-color: #27a7e7; }
+  .dest-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dest-head .grow { flex: 1; }
+  .savebar { position: sticky; bottom: 0; background: linear-gradient(transparent, var(--bg) 30%); padding: 20px 0 10px; display: flex; gap: 10px; align-items: center; }
+  .toast { color: var(--ok); font-size: 14px; }
+  table.log { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.log td { padding: 6px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+  .help { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+  .help code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+  .empty { color: var(--muted); padding: 30px; text-align: center; border: 1px dashed var(--border); border-radius: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🖥️ Carter<span>PCs</span> Monitor</h1>
+  <div class="meta">
+    <span id="lastcheck"></span>
+    <button class="btn ghost" id="refresh">Check now</button>
+  </div>
+</header>
+<nav id="tabs"></nav>
+<main id="view"></main>
+
+<script>
+const PLATFORMS = {
+  youtube:   { name: "YouTube",   color: "var(--youtube)",   emoji: "▶️", url: h => `https://www.youtube.com/@${h}` },
+  tiktok:    { name: "TikTok",    color: "var(--tiktok)",    emoji: "🎵", url: h => `https://www.tiktok.com/@${h}` },
+  instagram: { name: "Instagram", color: "var(--instagram)", emoji: "📸", url: h => `https://www.instagram.com/${h}/` },
+  twitter:   { name: "X",         color: "var(--twitter)",   emoji: "🐦", url: h => `https://x.com/${h}` },
+};
+const TABS = [["overview", "Overview", "var(--accent)"],
+  ...Object.entries(PLATFORMS).map(([k, p]) => [k, `${p.emoji} ${p.name}`, p.color]),
+  ["settings", "⚙️ Settings", "var(--accent)"]];
+let tab = location.hash.slice(1) || "overview", state = null, settings = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => n == null ? "–" : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(/\.?0+$/, "") + "M"
+  : n >= 1e4 ? (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K" : n.toLocaleString();
+function ago(ts) {
+  if (!ts) return "";
+  const s = Date.now() / 1000 - ts;
+  for (const [u, n] of [["y", 31536000], ["mo", 2592000], ["d", 86400], ["h", 3600], ["m", 60]])
+    if (s >= n) return Math.floor(s / n) + u + " ago";
+  return "just now";
+}
+const api = (path, body) => fetch(path, body === undefined ? {} :
+  { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+
+function renderTabs() {
+  $("#tabs").innerHTML = TABS.map(([k, label, c]) =>
+    `<button data-tab="${k}" style="--tab-color:${c}" class="${k === tab ? "active" : ""}">${label}</button>`).join("");
+}
+$("#tabs").onclick = e => { const b = e.target.closest("button"); if (b) { if ($(".settings")) readSettings(); tab = b.dataset.tab; location.hash = tab; render(); } };
+window.addEventListener("hashchange", () => {
+  const t = location.hash.slice(1);
+  if (t && t !== tab && TABS.some(([k]) => k === t)) { if ($(".settings")) readSettings(); tab = t; render(); }
+});
+
+function spark(history, color) {
+  if (!history || history.length < 2) return "";
+  const ys = history.map(h => h[1]), min = Math.min(...ys), max = Math.max(...ys), w = 200, h = 40;
+  const pts = history.map((p, i) => `${(i / (history.length - 1)) * w},${max === min ? h / 2 : h - 4 - ((p[1] - min) / (max - min)) * (h - 8)}`).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+function thumb(p, plat) {
+  return p.thumbnail
+    ? `<div class="thumb" style="background-image:url('${esc(p.thumbnail)}')"></div>`
+    : `<div class="thumb">${PLATFORMS[plat].emoji}</div>`;
+}
+
+function renderOverview() {
+  return `<div class="grid">${Object.entries(PLATFORMS).map(([k, P]) => {
+    const s = state[k]; if (!s.enabled) return "";
+    const latest = s.posts[0];
+    return `<div class="card">
+      <h3><span class="dot" style="background:${P.color}"></span>${P.name}
+        <a class="muted" style="margin-left:auto" href="${P.url(s.handle)}" target="_blank" rel="noopener">@${esc(s.handle)}</a></h3>
+      <div class="big">${fmt(s.stats.followers)}</div>
+      <div class="muted">followers · ${fmt(s.stats.posts)} posts</div>
+      ${spark(s.history, P.color)}
+      ${latest ? `<a class="latest" href="${esc(latest.url)}" target="_blank" rel="noopener">
+        ${latest.thumbnail ? `<img src="${esc(latest.thumbnail)}" referrerpolicy="no-referrer" alt="" onerror="this.remove()">` : ""}
+        <div><div>${esc(latest.title)}</div><div class="muted">${ago(latest.published)}</div></div></a>` : ""}
+      ${s.error ? `<div class="err">⚠ ${esc(s.error)}</div>` : ""}
+    </div>`;
+  }).join("")}</div>
+  <h2 style="font-size:17px;margin:28px 0 10px">Recent notifications</h2>
+  ${state.notify_log.length ? `<div class="card"><table class="log">${state.notify_log.slice().reverse().map(l => `<tr>
+    <td>${l.ok ? "✅" : "❌"}</td><td class="muted">${ago(l.time)}</td><td>${PLATFORMS[l.platform].emoji}</td>
+    <td>${esc(l.title)}${l.error ? `<div class="err">${esc(l.error)}</div>` : ""}</td><td class="muted">→ ${esc(l.destination)}</td></tr>`).join("")}</table></div>`
+    : `<div class="empty">No notifications sent yet. Add a Discord or Telegram destination in Settings.</div>`}`;
+}
+
+function renderPlatform(k) {
+  const s = state[k], P = PLATFORMS[k];
+  if (!s.enabled) return `<div class="empty">${P.name} monitoring is turned off in Settings.</div>`;
+  const statCards = [["Followers", s.stats.followers], ["Posts", s.stats.posts], ["Likes", s.stats.likes], ["Following", s.stats.following]]
+    .filter(([, v]) => v != null).map(([l, v]) => `<div class="card"><div class="muted">${l}</div><div class="big">${fmt(v)}</div></div>`).join("");
+  return `<div class="row" style="margin-bottom:14px;align-items:center">
+      <h2 style="margin:0;flex:none"><a href="${P.url(s.handle)}" target="_blank" rel="noopener">@${esc(s.handle)}</a></h2>
+      <span class="muted" style="text-align:right">${s.last_check ? "Checked " + ago(s.last_check) : "Not checked yet"}</span></div>
+    ${s.error ? `<div class="err" style="margin-bottom:12px">⚠ ${esc(s.error)}</div>` : ""}
+    <div class="stats">${statCards}</div>
+    ${s.posts.length ? `<div class="posts">${s.posts.map(p => `<a class="post" href="${esc(p.url)}" target="_blank" rel="noopener">
+      ${thumb(p, k)}<div class="body"><div class="title">${esc(p.title)}</div>
+      <div class="muted" style="margin-top:6px"><span class="tag">${esc(p.kind === "count" ? "detected" : p.kind)}</span>${ago(p.published)}</div></div></a>`).join("")}</div>`
+      : `<div class="empty">No posts yet. The first check may still be running.</div>`}`;
+}
+
+// ------------------------------------------------------------- settings --
+function renderSettings() {
+  const s = settings;
+  const plats = Object.entries(PLATFORMS).map(([k, P]) => {
+    const c = s.platforms[k];
+    return `<div class="card" style="margin-bottom:10px">
+      <h3><span class="dot" style="background:${P.color}"></span>${P.name}
+        <label class="check" style="margin:0 0 0 auto"><input type="checkbox" data-plat="${k}" data-f="enabled" ${c.enabled ? "checked" : ""}> Monitor</label></h3>
+      <div class="row">
+        <div><label>Handle (without @)</label><input type="text" data-plat="${k}" data-f="handle" value="${esc(c.handle)}"></div>
+        <div><label>Custom RSS feed URL (optional)</label><input type="url" data-plat="${k}" data-f="feed_url" value="${esc(c.feed_url)}" placeholder="e.g. an RSSHub feed"></div>
+      </div>
+      ${k === "twitter" ? `<label class="check"><input type="checkbox" data-plat="twitter" data-f="include_reposts" ${c.include_reposts ? "checked" : ""}> Include reposts</label>` : ""}
+      ${k === "tiktok" ? `<p class="help">TikTok only reports the video count without a login, so alerts say "new TikTok posted" with a profile link. Add an RSS feed URL to get video titles.</p>` : ""}
+    </div>`;
+  }).join("");
+
+  const dests = s.destinations.map((d, i) => `<div class="card dest ${d.type}" data-i="${i}">
+    <div class="dest-head">
+      <strong>${d.type === "discord" ? "💬 Discord" : "✈️ Telegram"}</strong>
+      <input type="text" class="grow" data-d="name" value="${esc(d.name)}" placeholder="Name, e.g. #youtube-uploads">
+      <label class="check" style="margin:0"><input type="checkbox" data-d="enabled" ${d.enabled !== false ? "checked" : ""}> On</label>
+      <button class="btn ghost" data-act="test">Send test</button>
+      <button class="btn danger" data-act="del">Remove</button>
+    </div>
+    ${d.type === "discord"
+      ? `<label>Webhook URL</label><input type="password" data-d="webhook_url" value="${esc(d.webhook_url)}" placeholder="https://discord.com/api/webhooks/…">
+         <label>Mention (optional)</label><input type="text" data-d="mention" value="${esc(d.mention)}" placeholder="@everyone or <@&roleId>">`
+      : `<div class="row"><div><label>Bot token</label><input type="password" data-d="bot_token" value="${esc(d.bot_token)}" placeholder="123456:ABC…"></div>
+         <div><label>Chat ID</label><input type="text" data-d="chat_id" value="${esc(d.chat_id)}" placeholder="-1001234567890 or @channelname"></div></div>`}
+    <label>Send these platforms here</label>
+    ${Object.entries(PLATFORMS).map(([k, P]) => `<label class="check"><input type="checkbox" data-dp="${k}" ${(d.platforms || []).includes(k) ? "checked" : ""}> ${P.emoji} ${P.name}</label>`).join("")}
+    <div class="muted" data-result style="margin-top:8px"></div>
+  </div>`).join("");
+
+  return `<section class="settings">
+    <h2>General</h2>
+    <div class="card"><div class="row">
+      <div><label>Check every (minutes, min 2)</label><input type="number" min="2" id="poll" value="${s.poll_minutes}"></div>
+      <div></div></div></div>
+
+    <h2>Platforms</h2>${plats}
+
+    <h2>Notifications</h2>
+    <p class="help">Add one destination per channel. Pick which platforms go to each. Send everything to one channel, or give YouTube its own.</p>
+    <div id="dests">${dests || `<div class="empty" style="margin-bottom:12px">No destinations yet.</div>`}</div>
+    <button class="btn ghost" data-add="discord">+ Discord webhook</button>
+    <button class="btn ghost" data-add="telegram">+ Telegram chat</button>
+    <details class="help" style="margin-top:12px"><summary>How do I get these?</summary>
+      <p><b>Discord:</b> Channel → Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL.</p>
+      <p><b>Telegram:</b> Message <code>@BotFather</code>, send <code>/newbot</code> and copy the token. Add the bot to your group/channel
+      (as admin for channels). For the chat ID use <code>@yourchannel</code> for public channels, or message the bot and open
+      <code>https://api.telegram.org/bot&lt;token&gt;/getUpdates</code> to find the numeric <code>chat.id</code>.</p>
+    </details>
+
+    <h2>Updates</h2>
+    <div class="card">
+      <label class="check"><input type="checkbox" id="autoupd" ${s.auto_update ? "checked" : ""}> Auto-update from GitHub</label>
+      <div class="row" style="margin-top:6px">
+        <div><label>Check for updates every (minutes)</label><input type="number" min="10" id="updmin" value="${s.update_check_minutes}"></div>
+        <div><button class="btn ghost" id="updnow">Update now</button></div></div>
+      <p class="help">Version <code>${esc(state?.version)}</code> · ${esc(state?.update?.message)}${state?.update?.last_check ? " (" + ago(state.update.last_check) + ")" : ""}</p>
+      <p class="help" id="updres"></p>
+    </div>
+
+    <div class="savebar"><button class="btn" id="save">Save settings</button><span class="toast" id="toast"></span></div>
+  </section>`;
+}
+
+function readSettings() {
+  const s = settings;
+  s.poll_minutes = +$("#poll").value || 10;
+  s.auto_update = $("#autoupd").checked;
+  s.update_check_minutes = +$("#updmin").value || 60;
+  document.querySelectorAll("[data-plat]").forEach(el =>
+    s.platforms[el.dataset.plat][el.dataset.f] = el.type === "checkbox" ? el.checked : el.value.trim().replace(/^@/, ""));
+  document.querySelectorAll(".dest").forEach(card => {
+    const d = s.destinations[card.dataset.i];
+    card.querySelectorAll("[data-d]").forEach(el => d[el.dataset.d] = el.type === "checkbox" ? el.checked : el.value.trim());
+    d.platforms = [...card.querySelectorAll("[data-dp]:checked")].map(el => el.dataset.dp);
+  });
+  return s;
+}
+
+$("#view").addEventListener("click", async e => {
+  const t = e.target;
+  if (t.dataset.add) {
+    readSettings();
+    settings.destinations.push({ type: t.dataset.add, name: "", enabled: true, platforms: Object.keys(PLATFORMS),
+      webhook_url: "", bot_token: "", chat_id: "", mention: "" });
+    render();
+  } else if (t.dataset.act === "del") {
+    readSettings();
+    settings.destinations.splice(t.closest(".dest").dataset.i, 1);
+    render();
+  } else if (t.dataset.act === "test") {
+    const card = t.closest(".dest"), out = card.querySelector("[data-result]");
+    out.textContent = "Sending…";
+    const r = await api("/api/test-destination", readSettings().destinations[card.dataset.i]);
+    out.textContent = r.ok ? "✅ Sent! Check your channel." : "❌ " + r.error;
+  } else if (t.id === "save") {
+    await api("/api/settings", readSettings());
+    $("#toast").textContent = "Saved ✓ Checking now…";
+    setTimeout(() => $("#toast") && ($("#toast").textContent = ""), 3000);
+  } else if (t.id === "updnow") {
+    t.disabled = true; $("#updres").textContent = "Checking GitHub…";
+    const r = await api("/api/update", {});
+    $("#updres").textContent = r.message;
+    if (r.updated) setTimeout(() => location.reload(), 8000);
+    t.disabled = false;
+  }
+});
+
+// --------------------------------------------------------------- render --
+function render() {
+  renderTabs();
+  if (!state) return;
+  const v = $("#view");
+  if (tab === "settings") { if (settings) v.innerHTML = renderSettings(); }
+  else v.innerHTML = tab === "overview" ? renderOverview() : renderPlatform(tab);
+  const last = Math.max(0, ...Object.keys(PLATFORMS).map(k => state[k].last_check || 0));
+  $("#lastcheck").textContent = last ? `Last check ${ago(last)} · every ${state.poll_minutes} min` : "Starting up…";
+}
+
+async function refresh() {
+  try { state = await api("/api/state"); } catch { return; }
+  // Don't redraw settings while the user is typing in them.
+  if (tab !== "settings") render(); else if (!$(".settings")) render();
+}
+$("#refresh").onclick = async () => { await api("/api/check", {}); $("#refresh").textContent = "Checking…";
+  setTimeout(() => { $("#refresh").textContent = "Check now"; refresh(); }, 6000); };
+
+(async () => {
+  settings = (await api("/api/settings")).settings;
+  await refresh();
+  setInterval(refresh, 30000);
+})();
+</script>
+</body>
+</html>
