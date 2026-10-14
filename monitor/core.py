@@ -16,11 +16,13 @@ DATA_DIR = Path(os.environ.get("CARTERPCS_DATA", ROOT / "data"))
 SETTINGS_FILE = DATA_DIR / "settings.json"
 STATE_FILE = DATA_DIR / "state.json"
 
-PLATFORMS = ["youtube", "tiktok", "instagram", "twitter"]
+PLATFORMS = ["youtube", "tiktok", "instagram"]
 MAX_POSTS_SHOWN = 30
 MAX_SEEN = 500
 MAX_HISTORY = 500
 MAX_NOTIFY_PER_CHECK = 5  # per platform, so a glitch can't spam a channel
+# Bump when a fetcher changes how post IDs work, so upgrades re-seed instead of re-alerting.
+SOURCE_VERSION = 2
 
 DEFAULT_SETTINGS = {
     "poll_minutes": 10,
@@ -28,7 +30,6 @@ DEFAULT_SETTINGS = {
         "youtube": {"enabled": True, "handle": "actuallycarterpcs", "feed_url": ""},
         "tiktok": {"enabled": True, "handle": "carterpcs", "feed_url": ""},
         "instagram": {"enabled": True, "handle": "carterpcs_", "feed_url": ""},
-        "twitter": {"enabled": True, "handle": "carternotpcs", "feed_url": "", "include_reposts": False},
     },
     # Each destination: {id, name, type: discord|telegram, enabled, webhook_url,
     #                    bot_token, chat_id, mention, platforms: [...]}
@@ -67,6 +68,7 @@ class Monitor:
         self.lock = threading.RLock()
         self.wake = threading.Event()
         self.settings = _merge(DEFAULT_SETTINGS, _load(SETTINGS_FILE, {}))
+        self._drop_unknown_platforms()
         self.state = _load(STATE_FILE, {})
         for p in PLATFORMS:
             self.state.setdefault(p, {"seen": [], "posts": [], "stats": {}, "history": [],
@@ -83,8 +85,16 @@ class Monitor:
         with self.lock:
             self.settings = _merge(DEFAULT_SETTINGS, new)
             self.settings["poll_minutes"] = max(2, int(self.settings["poll_minutes"]))
+            self._drop_unknown_platforms()
             _save(SETTINGS_FILE, self.settings)
         self.wake.set()  # re-check with the new settings straight away
+
+    def _drop_unknown_platforms(self):
+        """Forget platforms that were removed (e.g. X) from older settings files."""
+        s = self.settings
+        s["platforms"] = {k: v for k, v in s["platforms"].items() if k in PLATFORMS}
+        for d in s["destinations"]:
+            d["platforms"] = [p for p in d.get("platforms", []) if p in PLATFORMS]
 
     # ------------------------------------------------------------- state --
     def public_state(self):
@@ -95,7 +105,7 @@ class Monitor:
                 out[p] = {k: s[k] for k in ("posts", "stats", "history", "error", "last_check")}
                 out[p]["handle"] = self.settings["platforms"][p]["handle"]
                 out[p]["enabled"] = self.settings["platforms"][p]["enabled"]
-            out["notify_log"] = self.state["notify_log"][-30:]
+            out["notify_log"] = [l for l in self.state["notify_log"] if l["platform"] in PLATFORMS][-30:]
             out["version"] = updater.version()
             out["update"] = self.update_status
             out["poll_minutes"] = self.settings["poll_minutes"]
@@ -105,9 +115,11 @@ class Monitor:
     def check_platform(self, p):
         cfg = self.settings["platforms"][p]
         st = self.state[p]
-        if cfg["handle"] != st["cache"].get("handle"):
-            # Handle changed: forget everything so we don't notify on old posts.
-            st.update(seen=[], posts=[], history=[], seeded=False, cache={"handle": cfg["handle"]})
+        if cfg["handle"] != st["cache"].get("handle") or st["cache"].get("v") != SOURCE_VERSION:
+            # Handle or fetcher changed: start fresh so we don't notify on old posts.
+            history = st["history"] if cfg["handle"] == st["cache"].get("handle") else []
+            st.update(seen=[], posts=[], history=history, seeded=False,
+                      cache={"handle": cfg["handle"], "v": SOURCE_VERSION})
 
         errors, result = [], {"stats": {}, "posts": []}
         try:
@@ -120,9 +132,9 @@ class Monitor:
             except Exception as e:
                 errors.append(f"Custom feed: {e}")
 
+        if result.get("warning"):
+            errors.append(result["warning"])
         posts = result["posts"]
-        if p == "twitter" and not cfg.get("include_reposts"):
-            posts = [x for x in posts if x["kind"] != "repost"]
 
         new_posts = []
         with self.lock:

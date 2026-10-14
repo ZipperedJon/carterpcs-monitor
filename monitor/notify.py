@@ -8,10 +8,9 @@ PLATFORM_INFO = {
     "youtube": {"name": "YouTube", "color": 0xFF0000, "emoji": "▶️"},
     "tiktok": {"name": "TikTok", "color": 0x25F4EE, "emoji": "🎵"},
     "instagram": {"name": "Instagram", "color": 0xE1306C, "emoji": "📸"},
-    "twitter": {"name": "X / Twitter", "color": 0x1D9BF0, "emoji": "🐦"},
 }
-KIND_LABEL = {"video": "New video", "short": "New Short", "reel": "New Reel", "tweet": "New post",
-              "reply": "New reply", "repost": "New repost", "post": "New post", "count": "New upload"}
+KIND_LABEL = {"video": "New video", "short": "New Short", "reel": "New Reel",
+              "post": "New post", "count": "New upload"}
 
 
 def send(dest, platform, post):

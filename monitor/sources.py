@@ -86,91 +86,100 @@ def fetch_youtube(handle, cache):
 # ----------------------------------------------------------------- TikTok --
 
 def fetch_tiktok(handle, cache):
-    page = _get(f"https://www.tiktok.com/@{handle}").text
-    m = re.search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', page, re.S)
+    stats, errors = {}, []
+    try:
+        page = _get(f"https://www.tiktok.com/@{handle}").text
+        m = re.search(r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>(.*?)</script>', page, re.S)
+        s = json.loads(m.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]["userInfo"]["stats"]
+        stats = {"followers": s.get("followerCount"), "posts": s.get("videoCount"),
+                 "likes": s.get("heartCount"), "following": s.get("followingCount")}
+    except Exception as e:
+        errors.append(f"Stats: {e}")
+
+    # The creator embed (used for "embed my profile" widgets) lists the latest
+    # videos without needing TikTok's signed API.
+    page = _get(f"https://www.tiktok.com/embed/@{handle}").text
+    m = re.search(r'<script id="__FRONTITY_CONNECT_STATE__"[^>]*>(.*?)</script>', page, re.S)
     if not m:
-        raise RuntimeError("TikTok page layout changed (no profile data found)")
-    info = json.loads(m.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]["userInfo"]
-    s = info.get("stats") or {}
-    stats = {"followers": s.get("followerCount"), "posts": s.get("videoCount"),
-             "likes": s.get("heartCount"), "following": s.get("followingCount")}
-    # TikTok's video list needs signed requests, so detect uploads by the
-    # video count going up instead. Add an RSS feed URL in settings for titles.
+        raise RuntimeError("TikTok embed layout changed (no video list found)")
+    data = json.loads(m.group(1))["source"]["data"]
+    videos = next((v["videoList"] for v in data.values() if isinstance(v, dict) and "videoList" in v), [])
     posts = []
-    count = stats["posts"]
-    if count:
-        posts.append(_post(f"count-{count}", f"https://www.tiktok.com/@{handle}",
-                           f"New TikTok posted (video #{count:,})",
-                           info.get("user", {}).get("avatarLarger", ""), time.time(), "count"))
-    return {"stats": stats, "posts": posts}
+    for v in videos:
+        vid = str(v["id"])
+        posts.append(_post(vid, f"https://www.tiktok.com/@{handle}/video/{vid}",
+                           (v.get("desc") or "New TikTok").split("\n")[0][:200],
+                           v.get("coverUrl") or v.get("originCoverUrl") or "",
+                           int(vid) >> 32,  # TikTok IDs start with the upload time
+                           "video"))
+    return {"stats": stats, "posts": posts, "warning": "; ".join(errors) or None}
 
 
 # -------------------------------------------------------------- Instagram --
 
-def fetch_instagram(handle, cache):
-    # Best case: the web JSON API gives real posts. It is often rate limited,
-    # so fall back to the link-preview tags that Facebook's crawler gets.
-    try:
-        r = _get("https://www.instagram.com/api/v1/users/web_profile_info/",
-                 params={"username": handle},
-                 headers={"x-ig-app-id": "936619743392459", "X-Requested-With": "XMLHttpRequest",
-                          "Referer": f"https://www.instagram.com/{handle}/"})
-        user = r.json()["data"]["user"]
-        media = user["edge_owner_to_timeline_media"]
-        posts = []
-        for edge in media["edges"]:
-            n = edge["node"]
-            caps = n.get("edge_media_to_caption", {}).get("edges") or []
-            caption = caps[0]["node"]["text"] if caps else ""
-            kind = "reel" if n.get("product_type") == "clips" else ("video" if n.get("is_video") else "post")
-            posts.append(_post(n["shortcode"], f"https://www.instagram.com/p/{n['shortcode']}/",
-                               caption.split("\n")[0][:200], n.get("thumbnail_src") or n.get("display_url"),
-                               n.get("taken_at_timestamp"), kind))
-        stats = {"followers": user["edge_followed_by"]["count"],
-                 "following": user["edge_follow"]["count"], "posts": media["count"]}
-        return {"stats": stats, "posts": posts}
-    except Exception:
-        pass
-
+def _instagram_meta(handle):
+    """Follower/post counts from the link-preview tags. Rarely rate limited."""
     page = requests.get(f"https://www.instagram.com/{handle}/", timeout=TIMEOUT,
                         headers={"User-Agent": "facebookexternalhit/1.1"}).text
     m = re.search(r'content="([\d.,KMB]+) Followers, ([\d.,KMB]+) Following, ([\d.,KMB]+) Posts', page)
     if not m:
-        raise RuntimeError("Instagram blocked the request, will retry next check")
-    stats = {"followers": _parse_count(m.group(1)), "following": _parse_count(m.group(2)),
-             "posts": _parse_count(m.group(3))}
+        raise RuntimeError("Instagram blocked the profile request, will retry next check")
     img = re.search(r'<meta property="og:image" content="([^"]+)"', page)
-    count = stats["posts"]
-    posts = [_post(f"count-{count}", f"https://www.instagram.com/{handle}/",
-                   f"New Instagram post (post #{count:,})",
-                   html.unescape(img.group(1)) if img else "", time.time(), "count")]
-    return {"stats": stats, "posts": posts}
+    return ({"followers": _parse_count(m.group(1)), "following": _parse_count(m.group(2)),
+             "posts": _parse_count(m.group(3))}, html.unescape(img.group(1)) if img else "")
 
 
-# ------------------------------------------------------------- Twitter/X --
-
-def fetch_twitter(handle, cache):
-    # FxTwitter is a free public mirror of X's API (the same one fxtwitter.com embeds use).
-    headers = {"User-Agent": "carterpcs-monitor (+https://github.com)"}
-    user = _get(f"https://api.fxtwitter.com/{handle}", headers=headers).json().get("user") or {}
-    stats = {"followers": user.get("followers"), "following": user.get("following"),
-             "posts": user.get("tweets"), "likes": user.get("likes")}
-    data = _get(f"https://api.fxtwitter.com/2/profile/{handle}/statuses", headers=headers).json()
+def _instagram_api(handle):
+    """Real posts with links. Instagram rate limits this hard, so call it sparingly."""
+    r = _get("https://www.instagram.com/api/v1/users/web_profile_info/",
+             params={"username": handle},
+             headers={"x-ig-app-id": "936619743392459", "X-Requested-With": "XMLHttpRequest",
+                      "Referer": f"https://www.instagram.com/{handle}/"})
+    user = r.json()["data"]["user"]
+    media = user["edge_owner_to_timeline_media"]
     posts = []
-    for t in data.get("results") or []:
-        media = (t.get("media") or {}).get("all") or []
-        thumb = ""
-        if media:
-            thumb = media[0].get("thumbnail_url") or (media[0].get("url") if media[0].get("type") == "photo" else "")
-        author = (t.get("author") or {}).get("screen_name", "")
-        is_repost = bool(t.get("reposted_by")) or author.lower() != handle.lower()
-        title = t.get("text") or ""
-        if is_repost:
-            title = f"Reposted @{author}: {title}"
-        posts.append(_post(t["id"], t.get("url") or f"https://x.com/{handle}/status/{t['id']}",
-                           title[:280], thumb, t.get("created_timestamp"),
-                           "repost" if is_repost else ("reply" if t.get("replying_to") else "tweet")))
-    return {"stats": stats, "posts": posts}
+    for edge in media["edges"]:
+        n = edge["node"]
+        caps = n.get("edge_media_to_caption", {}).get("edges") or []
+        caption = caps[0]["node"]["text"] if caps else ""
+        is_reel = n.get("product_type") == "clips"
+        path = "reel" if is_reel else "p"
+        posts.append(_post(n["shortcode"], f"https://www.instagram.com/{path}/{n['shortcode']}/",
+                           caption.split("\n")[0][:200] or "New Instagram post",
+                           n.get("thumbnail_src") or n.get("display_url"), n.get("taken_at_timestamp"),
+                           "reel" if is_reel else ("video" if n.get("is_video") else "post")))
+    stats = {"followers": user["edge_followed_by"]["count"],
+             "following": user["edge_follow"]["count"], "posts": media["count"]}
+    return stats, posts
+
+
+IG_GIVE_UP_AFTER = 4  # failed API tries before falling back to a profile-link alert
+
+
+def fetch_instagram(handle, cache):
+    stats, avatar = _instagram_meta(handle)
+    count = stats["posts"]
+    cache.setdefault("known_count", count)  # first run: baseline, nothing is "new"
+    if count < cache["known_count"]:
+        cache["known_count"] = count  # a post was deleted
+    changed = count > cache["known_count"]
+    warning = None
+    # Only hit the rate-limited API when there's a new post, or to fill the dashboard.
+    if changed or not cache.get("posts"):
+        try:
+            api_stats, posts = _instagram_api(handle)
+            stats.update(api_stats)
+            cache.update(posts=posts, known_count=count, tries=0)
+        except Exception as e:
+            warning = "Instagram is rate limiting post lookups, will retry next check"
+            if changed:
+                cache["tries"] = cache.get("tries", 0) + 1
+                if cache["tries"] >= IG_GIVE_UP_AFTER:
+                    # Still blocked: alert anyway so the post isn't missed, linking the profile.
+                    fallback = _post(f"count-{count}", f"https://www.instagram.com/{handle}/",
+                                     f"New Instagram post (post #{count:,})", avatar, time.time(), "count")
+                    cache.update(posts=[fallback] + cache.get("posts", []), known_count=count, tries=0)
+    return {"stats": stats, "posts": cache.get("posts", []), "warning": warning}
 
 
 # ----------------------------------------------------- Custom RSS / Atom --
@@ -218,5 +227,4 @@ FETCHERS = {
     "youtube": fetch_youtube,
     "tiktok": fetch_tiktok,
     "instagram": fetch_instagram,
-    "twitter": fetch_twitter,
 }

@@ -9,7 +9,7 @@
   :root {
     --bg: #0d0f14; --panel: #161a22; --panel2: #1d222c; --border: #2a303c;
     --text: #e8ebf1; --muted: #8b93a4; --accent: #7c5cff; --ok: #3ecf8e; --bad: #ff5c6c;
-    --youtube: #ff3b3b; --tiktok: #25f4ee; --instagram: #e1306c; --twitter: #1d9bf0;
+    --youtube: #ff3b3b; --tiktok: #25f4ee; --instagram: #e1306c;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -88,7 +88,6 @@ const PLATFORMS = {
   youtube:   { name: "YouTube",   color: "var(--youtube)",   emoji: "▶️", url: h => `https://www.youtube.com/@${h}` },
   tiktok:    { name: "TikTok",    color: "var(--tiktok)",    emoji: "🎵", url: h => `https://www.tiktok.com/@${h}` },
   instagram: { name: "Instagram", color: "var(--instagram)", emoji: "📸", url: h => `https://www.instagram.com/${h}/` },
-  twitter:   { name: "X",         color: "var(--twitter)",   emoji: "🐦", url: h => `https://x.com/${h}` },
 };
 const TABS = [["overview", "Overview", "var(--accent)"],
   ...Object.entries(PLATFORMS).map(([k, p]) => [k, `${p.emoji} ${p.name}`, p.color]),
@@ -183,8 +182,7 @@ function renderSettings() {
         <div><label>Handle (without @)</label><input type="text" data-plat="${k}" data-f="handle" value="${esc(c.handle)}"></div>
         <div><label>Custom RSS feed URL (optional)</label><input type="url" data-plat="${k}" data-f="feed_url" value="${esc(c.feed_url)}" placeholder="e.g. an RSSHub feed"></div>
       </div>
-      ${k === "twitter" ? `<label class="check"><input type="checkbox" data-plat="twitter" data-f="include_reposts" ${c.include_reposts ? "checked" : ""}> Include reposts</label>` : ""}
-      ${k === "tiktok" ? `<p class="help">TikTok only reports the video count without a login, so alerts say "new TikTok posted" with a profile link. Add an RSS feed URL to get video titles.</p>` : ""}
+      ${k === "instagram" ? `<p class="help">Instagram rate limits heavily. If it blocks the post lookup for ~40 minutes after a new post, the alert links to the profile instead.</p>` : ""}
     </div>`;
   }).join("");
 

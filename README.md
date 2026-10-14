@@ -1,13 +1,12 @@
 # 🖥️ CarterPCs Monitor
 
-A small, fun self-hosted dashboard that tracks **CarterPCs** across YouTube, TikTok, Instagram and X, and pings your **Discord** or **Telegram** when something new goes up. It's built to run on a Raspberry Pi.
+A small, fun self-hosted dashboard that tracks **CarterPCs** across YouTube, TikTok and Instagram, and pings your **Discord** or **Telegram** when something new goes up. It's built to run on a Raspberry Pi.
 
 | Platform | Account |
 |---|---|
 | ▶️ YouTube | [@actuallycarterpcs](https://www.youtube.com/@actuallycarterpcs) |
 | 🎵 TikTok | [@carterpcs](https://www.tiktok.com/@carterpcs) |
 | 📸 Instagram | [@carterpcs_](https://www.instagram.com/carterpcs_/) |
-| 🐦 X / Twitter | [@carternotpcs](https://x.com/carternotpcs) |
 
 ## Features
 
@@ -84,12 +83,13 @@ None of these platforms offer a free, login-free API, so the app uses public pag
 
 | Platform | What you get | How |
 |---|---|---|
-| YouTube | Every new video/Short with title + thumbnail, subscribers | Official RSS feed |
-| X | Every new post with text + image, followers | [FxTwitter](https://github.com/FixTweet/FxTwitter) public API |
-| Instagram | New posts with captions when available, otherwise "new post" alerts from the post count | Public web API, falling back to link-preview data |
-| TikTok | "New TikTok posted" alerts from the video count, followers, likes | Public profile page |
+| YouTube | Every new video/Short with title, thumbnail and link, plus subscribers | Official RSS feed |
+| TikTok | Every new video with caption, cover and direct link, plus followers and likes | TikTok's public creator-embed widget |
+| Instagram | New posts/Reels with caption, thumbnail and direct link, plus followers | Post count from the public profile preview; Instagram's web API is only called when the count goes up |
 
-Each platform also has an optional **Custom RSS feed URL** setting. If you run [RSSHub](https://docs.rsshub.app) (or use another feed service), paste a feed URL there to get full titles/thumbnails for TikTok or Instagram.
+Instagram rate-limits hard. If it keeps blocking the post lookup for about 40 minutes after a new post, you still get an alert, but it links to the profile instead of the post.
+
+Each platform also has an optional **Custom RSS feed URL** setting. If you run [RSSHub](https://docs.rsshub.app) (or use another feed service), paste a feed URL there to use it as that platform's post source instead.
 
 Social sites change their pages and rate-limit often. If one breaks, it shows a ⚠ on the dashboard while the others keep working, and the fix usually arrives through auto-update.
 
