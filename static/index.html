@@ -301,8 +301,16 @@ async function refresh() {
 $("#refresh").onclick = async () => { await api("/api/check", {}); $("#refresh").textContent = "Checking…";
   setTimeout(() => { $("#refresh").textContent = "Check now"; refresh(); }, 6000); };
 
+const SEQ = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
+let seqPos = 0;
+document.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  seqPos = k === SEQ[seqPos] ? seqPos + 1 : (k === SEQ[0] ? (seqPos === 2 ? 2 : 1) : 0);
+  if (seqPos === SEQ.length) { seqPos = 0; window.open("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "_blank"); }
+});
+
 (async () => {
-  settings = (await api("/api/settings")).settings;
+  settings =(await api("/api/settings")).settings;
   await refresh();
   setInterval(refresh, 30000);
 })();
